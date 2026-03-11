@@ -205,13 +205,12 @@ export function registerCreativeTools(
             object_story_spec.link_data.caption = caption;
           }
 
-          // v23.0 Call-to-action structure with proper value object
+          // Call-to-action structure
           if (call_to_action_type) {
             object_story_spec.link_data.call_to_action = {
               type: call_to_action_type,
               value: {
                 link: link_url,
-                link_format: "WEBSITE_LINK",
               },
             };
           }
@@ -236,7 +235,6 @@ export function registerCreativeTools(
               type: call_to_action_type,
               value: {
                 link: link_url,
-                link_format: "WEBSITE_LINK",
               },
             };
           }

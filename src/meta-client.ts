@@ -591,12 +591,13 @@ export class MetaApiClient {
     }
   ): Promise<AdCreative> {
     const formattedAccountId = this.auth.getAccountId(accountId);
-    const body = this.buildQueryString(creativeData);
 
+    // Send as JSON object (not form-encoded) to preserve special characters
+    // in nested objects like object_story_spec
     return this.makeRequest<AdCreative>(
       `${formattedAccountId}/adcreatives`,
       "POST",
-      body,
+      creativeData,
       formattedAccountId,
       true
     );
