@@ -604,7 +604,7 @@ export class MetaApiClient {
 
   // Ad Management
   async createAd(
-    adSetId: string,
+    accountId: string,
     adData: {
       name: string;
       adset_id: string;
@@ -612,20 +612,21 @@ export class MetaApiClient {
       status?: string;
     }
   ): Promise<Ad> {
+    const formattedAccountId = this.auth.getAccountId(accountId);
     this.debug("=== CREATE AD DEBUG ===");
-    this.debug("Ad Set ID:", adSetId);
+    this.debug("Account ID:", formattedAccountId);
     this.debug("Ad Data:", JSON.stringify(adData, null, 2));
 
     const body = this.buildQueryString(adData);
     this.debug("Request body:", body);
-    this.debug("API endpoint:", `${adSetId}/ads`);
+    this.debug("API endpoint:", `${formattedAccountId}/ads`);
 
     try {
       const result = await this.makeRequest<Ad>(
-        `${adSetId}/ads`,
+        `${formattedAccountId}/ads`,
         "POST",
         body,
-        undefined, // Don't pass account ID for rate limiting since we don't have it
+        formattedAccountId,
         true
       );
 
@@ -665,6 +666,57 @@ export class MetaApiClient {
       this.debug("=====================");
       throw error;
     }
+  }
+
+  async updateAd(
+    adId: string,
+    updates: {
+      name?: string;
+      status?: string;
+      creative?: { creative_id: string };
+    }
+  ): Promise<{ success: boolean }> {
+    const body = this.buildQueryString(updates);
+    return this.makeRequest<{ success: boolean }>(
+      adId,
+      "POST",
+      body,
+      undefined,
+      true
+    );
+  }
+
+  async getAd(
+    adId: string,
+    fields?: string[]
+  ): Promise<Ad> {
+    const queryParams = {
+      fields: fields?.join(",") ||
+        "id,name,adset_id,campaign_id,status,effective_status,created_time,updated_time,creative",
+    };
+    const query = this.buildQueryString(queryParams);
+    return this.makeRequest<Ad>(`${adId}?${query}`);
+  }
+
+  async duplicateAd(
+    adId: string,
+    adSetId?: string
+  ): Promise<{ copied_ad_id: string }> {
+    const body: Record<string, any> = {
+      status_option: "PAUSED",
+      rename_strategy: "NO_RENAME",
+    };
+    if (adSetId) {
+      body.adset_id = adSetId;
+    }
+    const bodyStr = this.buildQueryString(body);
+    return this.makeRequest<{ copied_ad_id: string }>(
+      `${adId}/copies`,
+      "POST",
+      bodyStr || undefined,
+      undefined,
+      true
+    );
   }
 
   // Ad Methods

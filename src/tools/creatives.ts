@@ -1,4 +1,5 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { z } from "zod";
 import { MetaApiClient } from "../meta-client.js";
 import {
   ListCreativesSchema,
@@ -8,7 +9,7 @@ import {
   AnalyzeCreativesSchema,
   CreativeValidationEnhancedSchema,
   UploadImageFromUrlSchema,
-} from "../types/mcp-tools";
+} from "../types/mcp-tools.js";
 
 export function setupCreativeTools(
   server: McpServer,
@@ -2256,17 +2257,8 @@ export function registerCreativeTools(
     "get_meta_error_codes",
     "Get detailed reference for Meta Marketing API error codes, subcodes, and specific solutions. Essential for troubleshooting v23.0 API integration issues.",
     {
-      error_code: {
-        type: "string",
-        description:
-          "Specific error code to look up (optional - returns all if not provided)",
-        optional: true,
-      },
-      error_subcode: {
-        type: "string",
-        description: "Specific error subcode for detailed guidance (optional)",
-        optional: true,
-      },
+      error_code: z.string().optional().describe("Specific error code to look up (optional - returns all if not provided)"),
+      error_subcode: z.string().optional().describe("Specific error subcode for detailed guidance (optional)"),
     },
     async ({ error_code, error_subcode }) => {
       try {

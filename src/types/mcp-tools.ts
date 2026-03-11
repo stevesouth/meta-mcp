@@ -946,6 +946,45 @@ export const CreativeValidationEnhancedSchema = z.object({
     .describe("Caption text (typically domain name)"),
 });
 
+// Ad Management Schemas
+export const CreateAdSchema = z.object({
+  account_id: z.string().describe("Meta Ad Account ID"),
+  ad_set_id: z.string().describe("Ad Set ID to create the ad under"),
+  name: z.string().min(1).describe("Ad name"),
+  creative_id: z
+    .string()
+    .describe("Creative ID to use for the ad (from create_ad_creative)"),
+  status: z
+    .enum(["ACTIVE", "PAUSED"])
+    .default("PAUSED")
+    .describe("Initial ad status"),
+});
+
+export const UpdateAdSchema = z.object({
+  ad_id: z.string().describe("Ad ID to update"),
+  name: z.string().optional().describe("New ad name"),
+  status: z
+    .enum(["ACTIVE", "PAUSED", "DELETED", "ARCHIVED"])
+    .optional()
+    .describe("New ad status"),
+  creative_id: z
+    .string()
+    .optional()
+    .describe("New creative ID to swap in"),
+});
+
+export const GetAdSchema = z.object({
+  ad_id: z.string().describe("Ad ID to retrieve"),
+});
+
+export const DuplicateAdSchema = z.object({
+  ad_id: z.string().describe("Ad ID to duplicate"),
+  ad_set_id: z
+    .string()
+    .optional()
+    .describe("Target ad set ID (defaults to same ad set as original)"),
+});
+
 // Upload Image from URL Schema
 export const UploadImageFromUrlSchema = z.object({
   account_id: z.string().describe("Meta Ad Account ID (with act_ prefix)"),
@@ -996,3 +1035,7 @@ export type CreativeValidationEnhancedParams = z.infer<
   typeof CreativeValidationEnhancedSchema
 >;
 export type UploadImageFromUrlParams = z.infer<typeof UploadImageFromUrlSchema>;
+export type CreateAdParams = z.infer<typeof CreateAdSchema>;
+export type UpdateAdParams = z.infer<typeof UpdateAdSchema>;
+export type GetAdParams = z.infer<typeof GetAdSchema>;
+export type DuplicateAdParams = z.infer<typeof DuplicateAdSchema>;

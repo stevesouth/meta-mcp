@@ -1,4 +1,5 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { z } from "zod";
 import { MetaApiClient } from "../meta-client.js";
 import {
   ListCampaignsSchema,
@@ -7,7 +8,11 @@ import {
   DeleteCampaignSchema,
   ListAdSetsSchema,
   CreateAdSetSchema,
-} from "../types/mcp-tools";
+  CreateAdSchema,
+  UpdateAdSchema,
+  GetAdSchema,
+  DuplicateAdSchema,
+} from "../types/mcp-tools.js";
 
 export function setupCampaignTools(
   server: McpServer,
@@ -1052,6 +1057,196 @@ export function registerCampaignTools(
     }
   );
 
+  // Create Ad Tool
+  server.tool(
+    "create_ad",
+    "Create a new ad under an ad set, linking a creative to it. Requires an ad set ID and creative ID (from create_ad_creative). The ad will appear in the same campaign as the ad set.",
+    CreateAdSchema.shape,
+    async ({ account_id, ad_set_id, name, creative_id, status }) => {
+      try {
+        const result = await metaClient.createAd(account_id, {
+          name,
+          adset_id: ad_set_id,
+          creative: { creative_id },
+          status: status || "PAUSED",
+        });
+
+        const response = {
+          success: true,
+          ad_id: result.id,
+          message: `Ad "${name}" created successfully`,
+          details: {
+            id: result.id,
+            name,
+            ad_set_id,
+            creative_id,
+            status: status || "PAUSED",
+          },
+        };
+
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify(response, null, 2),
+            },
+          ],
+        };
+      } catch (error) {
+        const errorMessage =
+          error instanceof Error ? error.message : "Unknown error occurred";
+        return {
+          content: [
+            {
+              type: "text",
+              text: `Error creating ad: ${errorMessage}`,
+            },
+          ],
+          isError: true,
+        };
+      }
+    }
+  );
+
+  // Update Ad Tool
+  server.tool(
+    "update_ad",
+    "Update an existing ad's name, status, or creative. Use this to swap a creative on a duplicated ad, rename an ad, or pause/activate it.",
+    UpdateAdSchema.shape,
+    async ({ ad_id, name, status, creative_id }) => {
+      try {
+        const updates: Record<string, any> = {};
+        if (name) updates.name = name;
+        if (status) updates.status = status;
+        if (creative_id) updates.creative = { creative_id };
+
+        if (Object.keys(updates).length === 0) {
+          return {
+            content: [
+              {
+                type: "text",
+                text: "Error: No updates provided. Specify at least one of: name, status, creative_id.",
+              },
+            ],
+            isError: true,
+          };
+        }
+
+        await metaClient.updateAd(ad_id, updates);
+
+        const response = {
+          success: true,
+          ad_id,
+          message: `Ad ${ad_id} updated successfully`,
+          updates_applied: {
+            ...(name && { name }),
+            ...(status && { status }),
+            ...(creative_id && { creative_id }),
+          },
+        };
+
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify(response, null, 2),
+            },
+          ],
+        };
+      } catch (error) {
+        const errorMessage =
+          error instanceof Error ? error.message : "Unknown error occurred";
+        return {
+          content: [
+            {
+              type: "text",
+              text: `Error updating ad: ${errorMessage}`,
+            },
+          ],
+          isError: true,
+        };
+      }
+    }
+  );
+
+  // Get Ad Tool
+  server.tool(
+    "get_ad",
+    "Retrieve full details for a specific ad by ID, including its creative, status, and parent ad set/campaign.",
+    GetAdSchema.shape,
+    async ({ ad_id }) => {
+      try {
+        const ad = await metaClient.getAd(ad_id);
+
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify({ ad }, null, 2),
+            },
+          ],
+        };
+      } catch (error) {
+        const errorMessage =
+          error instanceof Error ? error.message : "Unknown error occurred";
+        return {
+          content: [
+            {
+              type: "text",
+              text: `Error getting ad: ${errorMessage}`,
+            },
+          ],
+          isError: true,
+        };
+      }
+    }
+  );
+
+  // Duplicate Ad Tool
+  server.tool(
+    "duplicate_ad",
+    "Duplicate an existing ad, copying all its settings (targeting, copy, UTMs). Optionally place the copy in a different ad set. After duplicating, use update_ad to swap the creative or rename.",
+    DuplicateAdSchema.shape,
+    async ({ ad_id, ad_set_id }) => {
+      try {
+        const result = await metaClient.duplicateAd(ad_id, ad_set_id);
+
+        const response = {
+          success: true,
+          new_ad_id: result.copied_ad_id,
+          original_ad_id: ad_id,
+          message: `Ad ${ad_id} duplicated successfully`,
+          target_ad_set: ad_set_id || "same as original",
+          next_steps: [
+            "Use update_ad to rename the duplicated ad",
+            "Use update_ad with creative_id to swap in a different creative",
+          ],
+        };
+
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify(response, null, 2),
+            },
+          ],
+        };
+      } catch (error) {
+        const errorMessage =
+          error instanceof Error ? error.message : "Unknown error occurred";
+        return {
+          content: [
+            {
+              type: "text",
+              text: `Error duplicating ad: ${errorMessage}`,
+            },
+          ],
+          isError: true,
+        };
+      }
+    }
+  );
+
   // Get Campaign Details Tool
   server.tool(
     "get_campaign",
@@ -1329,10 +1524,7 @@ export function registerCampaignTools(
     "get_quick_fixes",
     "Get targeted troubleshooting tips for common Meta Ads API errors. Provide an error message to receive likely causes, suggestions, and next steps for resolution.",
     {
-      error_message: {
-        type: "string",
-        description: "The error message you received from the API",
-      },
+      error_message: z.string().describe("The error message you received from the API"),
     },
     async ({ error_message }) => {
       const fixes = {
@@ -1461,10 +1653,7 @@ export function registerCampaignTools(
     "verify_account_setup",
     "Verify that a Meta ad account is ready for ad creation. Checks for account access, payment method, Facebook pages, and active campaigns. Returns a setup status, recommendations, and warnings.",
     {
-      account_id: {
-        type: "string",
-        description: "Meta Ad Account ID to verify",
-      },
+      account_id: z.string().describe("Meta Ad Account ID to verify"),
     },
     async ({ account_id }) => {
       try {
